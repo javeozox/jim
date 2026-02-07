@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Self Lab</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    #app {
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    button {
+      padding: 12px 24px;
+      margin: 8px 0;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .primary { background-color: #FF3B30; color: #fff; }
+    .secondary { background-color: #333; color: #fff; }
+    input, select, textarea {
+      width: 90%;
+      padding: 8px;
+      margin: 8px 0;
+      font-size: 14px;
+      background: #111;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+    h1, h2, h3 { margin-bottom: 20px; }
+    p { margin: 12px 0; }
+    small { color: #AAA; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const experiments = [
+  { title: '7 дней без соцсетей', days: 7 },
+  { title: '5 дней без сахара', days: 5 },
+  { title: '3 дня без музыки', days: 3 },
+  { title: '7 дней без новостей', days: 7 },
+  { title: '5 дней без жалоб', days: 5 }
+];
+
+const app = document.getElementById('app');
+
+let state = JSON.parse(localStorage.getItem('selfLab')) || {};
+
+function saveState() {
+  localStorage.setItem('selfLab', JSON.stringify(state));
+}
+
+// -------------------- Экраны --------------------
+function renderSelection() {
+  state = {};
+  localStorage.removeItem('selfLab');
+
+  app.innerHTML = `
+    <h1>Выбери эксперимент</h1>
+    <p>Это будет неприятно. В этом и смысл.</p>
+    ${experiments.map((exp, i) => `<button class="primary" onclick="startExperiment(${i})">${exp.title} (${exp.days} дней)</button>`).join('')}
+  `;
+}
+
+function startExperiment(index) {
+  const exp = experiments[index];
+  state = {
+    active: true,
+    index: index,
+    currentDay: 1,
+    completedDays: 0,
+    moods: [],
+    notes: []
+  };
+  saveState();
+  renderExperiment();
+}
+
+function renderExperiment() {
+  const exp = experiments[state.index];
+  app.innerHTML = `
+    <h1>${exp.title}</h1>
+    <h3>День ${state.currentDay} из ${exp.days}</h3>
+    <p>Сегодня у тебя был выбор.</p>
+    <button class="primary" onclick="nextDay(true)">Я выдержал</button><br>
+    <button class="secondary" onclick="nextDay(false)">Я сорвался</button>
+    <small>Оба варианта допустимы.</small>
+  `;
+}
+
+function nextDay(success) {
+  state.successToday = success;
+  renderReflection();
+}
+
+// -------------------- Рефлексия --------------------
+function renderReflection() {
+  app.innerHTML = `
+    <h2>День завершён</h2>
+    <p>Как ты себя чувствуешь?</p>
+    <select id="mood">
+      <option value="хуже">хуже</option>
+      <option value="так же" selected>так же</option>
+      <option value="лучше">лучше</option>
+    </select>
+    <p>Что было самым сложным? (необязательно)</p>
+    <textarea id="note" rows="3" placeholder="Опиши кратко"></textarea><br>
+    <button class="primary" onclick="saveReflection()">Дальше</button>
+  `;
+}
+
+function saveReflection() {
+  const mood = document.getElementById('mood').value;
+  const note = document.getElementById('note').value;
+
+  state.moods.push(mood);
+  state.notes.push(note);
+
+  if (state.successToday) state.completedDays++;
+  state.currentDay++;
+
+  const exp = experiments[state.index];
+
+  if (state.currentDay > exp.days) {
+    renderResult();
+  } else {
+    saveState();
+    renderExperiment();
+  }
+}
+
+// -------------------- Результат --------------------
+function renderResult() {
+  const exp = experiments[state.index];
+  const moodSummary = state.moods.map((m,i)=>`День ${i+1}: ${m}`).join('<br>');
+
+  const shareText = `Я продержался ${state.completedDays} из ${exp.days} дней в эксперименте "${exp.title}"!`;
+
+  app.innerHTML = `
+    <h1>Данные собраны</h1>
+    <h2>${exp.title}</h2>
+    <p>Продержался: ${state.completedDays} из ${exp.days} дней</p>
+    <h3>Настроение по дням:</h3>
+    <p>${moodSummary}</p>
+    <button class="primary" onclick="renderSelection()">Новый эксперимент</button><br>
+    <button class="primary" onclick="shareResult()">Поделиться результатом</button>
+  `;
+  localStorage.removeItem('selfLab');
+
+  function shareResult() {
+    if (navigator.share) {
+      navigator.share({text: shareText});
+    } else {
+      prompt('Скопируй результат и поделись:', shareText);
+    }
+  }
+
+  window.shareResult = shareResult;
+}
+
+// -------------------- При загрузке --------------------
+if (state.active) {
+  renderExperiment();
+} else {
+  renderSelection();
+}
+</script>
+</body>
+</html>
